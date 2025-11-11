@@ -65,17 +65,6 @@ const editor = new EditorJS({
 });
 ```
 
-## Chart Types
-
-The plugin supports 6 different chart types, accessible via the tune menu:
-
-1. **Bar Chart** - Perfect for comparing categories
-2. **Line Chart** - Great for showing trends over time
-3. **Pie Chart** - Ideal for showing proportions
-4. **Doughnut Chart** - Modern alternative to pie charts
-5. **Radar Chart** - Compare multiple variables
-6. **Polar Area Chart** - Display multivariate data
-
 ## Development
 
 ### Setup
@@ -92,7 +81,7 @@ npm run dev
 
 This will start a Vite dev server at `http://localhost:5173` with a live demo of the chart tool.
 
-### Build for Production
+### Build
 
 ```bash
 npm run build
