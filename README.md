@@ -2,14 +2,17 @@
 
 A Chart.js integration plugin for Editor.js that allows you to create charts right in the editor.
 
+<p align="center">
+  <img src="assets/bar1.png" width="45%" />
+  <img src="assets/pie1.png" width="45%" />
+</p>
+
 ## Features
 
 -   **6 Chart Types**: Bar, Line, Pie, Doughnut, Radar, and Polar Area charts
--   **Tune Menu Integration**: Chart type switching using Editor.js built-in tune menu
 -   **Full Editability**: Edit labels, data values, titles, and colors in real-time
 -   **Color Picker**: Choose from 12 preset colors for your charts
--   **Multiple Datasets**: Support for multiple data sets
--   **Responsive**: Charts automatically adjust to container size
+-   **Multiple Datasets**: Support for multiple data sets (in non-segmented charts)
 
 ## Installation
 
