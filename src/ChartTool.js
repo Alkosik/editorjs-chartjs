@@ -199,10 +199,50 @@ export default class ChartTool {
 			'input',
 			this.data.labels.join(', '),
 			(value) => {
-				this.data.labels = value
+				const newLabels = value
 					.split(',')
 					.map((l) => l.trim())
 					.filter((l) => l);
+
+				// Update datasets data array to match new labels length
+				this.data.datasets.forEach((dataset) => {
+					const currentLength = dataset.data.length;
+					const newLength = newLabels.length;
+
+					if (newLength > currentLength) {
+						// Add zeros for new labels
+						dataset.data = [
+							...dataset.data,
+							...new Array(newLength - currentLength).fill(0),
+						];
+
+						// Add colors for new labels if using array of colors
+						if (Array.isArray(dataset.backgroundColor)) {
+							const newColors = [];
+							for (let i = currentLength; i < newLength; i++) {
+								newColors.push(this.colors[i % this.colors.length]);
+							}
+							dataset.backgroundColor = [
+								...dataset.backgroundColor,
+								...newColors,
+							];
+						}
+					} else if (newLength < currentLength) {
+						// Remove extra data points
+						dataset.data = dataset.data.slice(0, newLength);
+
+						// Remove extra colors if using array of colors
+						if (Array.isArray(dataset.backgroundColor)) {
+							dataset.backgroundColor = dataset.backgroundColor.slice(
+								0,
+								newLength,
+							);
+						}
+					}
+				});
+
+				this.data.labels = newLabels;
+				this._refreshDatasets();
 				this._updateChart();
 			},
 		);
@@ -266,6 +306,31 @@ export default class ChartTool {
 			const datasetSection = this._createDatasetEditor(dataset, index);
 			this.datasetsContainer.appendChild(datasetSection);
 		});
+
+		// Re-render the add button if needed
+		this._refreshAddButton();
+	}
+
+	_refreshAddButton() {
+		// Remove existing add button if any
+		const existingButton = this.wrapper.querySelector(`.${this.CSS.addButton}`);
+		if (existingButton) {
+			existingButton.remove();
+		}
+
+		// Add button only for non-segment charts
+		if (!this._isSegmentBasedChart()) {
+			const settings = this.wrapper.querySelector(`.${this.CSS.settings}`);
+			if (settings) {
+				const addButton = document.createElement('button');
+				addButton.classList.add(this.CSS.addButton);
+				addButton.textContent = '+ Add Dataset';
+				addButton.addEventListener('click', () => {
+					this._addDataset();
+				});
+				settings.appendChild(addButton);
+			}
+		}
 	}
 
 	_createField(labelText, type, value, onChange) {
@@ -714,6 +779,30 @@ export default class ChartTool {
 			isActive: this.data.type === tune.name,
 			closeOnActivate: true,
 			onActivate: () => {
+				const isSegmentBased = [
+					'pie',
+					'doughnut',
+					'polarArea',
+					'radar',
+				].includes(tune.name);
+				const hasMultipleDatasets = this.data.datasets.length > 1;
+
+				// If switching to segment-based chart with multiple datasets, show confirmation
+				if (isSegmentBased && hasMultipleDatasets) {
+					const confirmed = confirm(
+						`${tune.title} only supports a single dataset. ` +
+							`Switching will keep only the first dataset and discard the others. ` +
+							`Do you want to continue?`,
+					);
+
+					if (!confirmed) {
+						return; // Cancel the chart type change
+					}
+
+					// Keep only the first dataset
+					this.data.datasets = [this.data.datasets[0]];
+				}
+
 				this.data.type = tune.name;
 				this._refreshDatasets();
 				this._updateChart();
