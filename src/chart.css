@@ -85,6 +85,13 @@
 	max-width: 400px;
 }
 
+.chart-tool__colors--popup {
+	display: grid;
+	grid-template-columns: repeat(4, 1fr);
+	gap: 10px;
+	max-width: 200px;
+}
+
 .chart-tool__color {
 	width: 36px;
 	height: 36px;
@@ -163,6 +170,41 @@
 	color: white;
 	border-color: #f44336;
 	transform: scale(1.05);
+}
+
+/* Toggle Switch Styling */
+input[type='checkbox'] {
+	appearance: none;
+	-webkit-appearance: none;
+	width: 40px;
+	height: 20px;
+	background: #e4e6eb;
+	border-radius: 10px;
+	position: relative;
+	cursor: pointer;
+	transition: background 0.3s ease;
+	outline: none;
+}
+
+input[type='checkbox']:checked {
+	background: #3f8ae0;
+}
+
+input[type='checkbox']::before {
+	content: '';
+	position: absolute;
+	width: 16px;
+	height: 16px;
+	border-radius: 50%;
+	background: white;
+	top: 2px;
+	left: 2px;
+	transition: transform 0.3s ease;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+input[type='checkbox']:checked::before {
+	transform: translateX(20px);
 }
 
 /* Tune menu styles */

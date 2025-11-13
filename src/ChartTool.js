@@ -67,6 +67,11 @@ export default class ChartTool {
 		];
 	}
 
+	// Check if chart type uses segment-based colors
+	_isSegmentBasedChart() {
+		return ['pie', 'doughnut', 'polarArea', 'radar'].includes(this.data.type);
+	}
+
 	render() {
 		this.wrapper = document.createElement('div');
 		this.wrapper.classList.add(this.CSS.wrapper);
@@ -83,14 +88,14 @@ export default class ChartTool {
 		if (!this.readOnly) {
 			const titleOverlay = document.createElement('div');
 			titleOverlay.style.cssText = `
-				position: absolute;
-				top: 0;
-				left: 0;
-				right: 0;
-				height: 60px;
-				cursor: text;
-				z-index: 10;
-			`;
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                height: 60px;
+                cursor: text;
+                z-index: 10;
+            `;
 			titleOverlay.title = 'Click to edit title';
 			titleOverlay.addEventListener('click', (e) => {
 				e.preventDefault();
@@ -114,14 +119,44 @@ export default class ChartTool {
 	}
 
 	_createChart(canvas) {
+		const isSegmentBased = this._isSegmentBasedChart();
+
 		const chartData = {
 			labels: this.data.labels,
-			datasets: this.data.datasets.map((dataset) => ({
-				...dataset,
-				borderColor: dataset.backgroundColor,
-				borderWidth: 2,
-				tension: 0.4,
-			})),
+			datasets: this.data.datasets.map((dataset) => {
+				const useMultiColor = isSegmentBased || dataset.useMultiColor;
+
+				const baseDataset = {
+					...dataset,
+					borderWidth: isSegmentBased ? 2 : 2,
+					tension: 0.4,
+				};
+
+				// For segment-based charts or multi-color mode, use array of colors
+				if (useMultiColor) {
+					if (Array.isArray(dataset.backgroundColor)) {
+						baseDataset.backgroundColor = dataset.backgroundColor;
+					} else {
+						// Generate colors for each data point
+						baseDataset.backgroundColor = dataset.data.map(
+							(_, idx) => this.colors[idx % this.colors.length],
+						);
+					}
+					baseDataset.borderColor = isSegmentBased
+						? '#fff'
+						: baseDataset.backgroundColor;
+				} else {
+					// Single color mode
+					baseDataset.backgroundColor = Array.isArray(
+						dataset.backgroundColor,
+					)
+						? dataset.backgroundColor[0] || this.colors[0]
+						: dataset.backgroundColor;
+					baseDataset.borderColor = baseDataset.backgroundColor;
+				}
+
+				return baseDataset;
+			}),
 		};
 
 		const options = {
@@ -129,7 +164,7 @@ export default class ChartTool {
 			maintainAspectRatio: false,
 			plugins: {
 				legend: {
-					display: this.data.datasets.length > 1,
+					display: isSegmentBased || this.data.datasets.length > 1,
 					position: 'top',
 				},
 				title: {
@@ -142,11 +177,6 @@ export default class ChartTool {
 				},
 			},
 		};
-
-		// Type-specific options
-		if (this.data.type === 'pie' || this.data.type === 'doughnut') {
-			options.plugins.legend.display = true;
-		}
 
 		if (this.chart) {
 			this.chart.destroy();
@@ -189,14 +219,16 @@ export default class ChartTool {
 
 		settings.appendChild(this.datasetsContainer);
 
-		// Add Dataset button
-		const addButton = document.createElement('button');
-		addButton.classList.add(this.CSS.addButton);
-		addButton.textContent = '+ Add Dataset';
-		addButton.addEventListener('click', () => {
-			this._addDataset();
-		});
-		settings.appendChild(addButton);
+		// Add Dataset button (only for non-segment charts)
+		if (!this._isSegmentBasedChart()) {
+			const addButton = document.createElement('button');
+			addButton.classList.add(this.CSS.addButton);
+			addButton.textContent = '+ Add Dataset';
+			addButton.addEventListener('click', () => {
+				this._addDataset();
+			});
+			settings.appendChild(addButton);
+		}
 
 		return settings;
 	}
@@ -263,6 +295,8 @@ export default class ChartTool {
 	}
 
 	_createDatasetEditor(dataset, index) {
+		const isSegmentBased = this._isSegmentBasedChart();
+
 		// Outer box container
 		const box = document.createElement('div');
 		box.classList.add(this.CSS.datasetBox);
@@ -273,11 +307,11 @@ export default class ChartTool {
 
 		const label = document.createElement('div');
 		label.classList.add(this.CSS.label);
-		label.textContent = `Dataset ${index + 1}`;
+		label.textContent = isSegmentBased ? 'Data' : `Dataset ${index + 1}`;
 		header.appendChild(label);
 
-		// Remove button (only show if more than 1 dataset)
-		if (this.data.datasets.length > 1) {
+		// Remove button (only show if more than 1 dataset and not segment-based)
+		if (!isSegmentBased && this.data.datasets.length > 1) {
 			const removeBtn = document.createElement('button');
 			removeBtn.classList.add(this.CSS.removeButton);
 			removeBtn.innerHTML = '×';
@@ -290,86 +324,298 @@ export default class ChartTool {
 
 		box.appendChild(header);
 
-		// Dataset name with label
-		const nameLabel = document.createElement('label');
-		nameLabel.classList.add(this.CSS.label);
-		nameLabel.textContent = 'Name';
-		nameLabel.style.marginBottom = '4px';
-		nameLabel.style.display = 'block';
-		box.appendChild(nameLabel);
+		// Dataset name (only for non-segment charts)
+		if (!isSegmentBased) {
+			const nameLabel = document.createElement('label');
+			nameLabel.classList.add(this.CSS.label);
+			nameLabel.textContent = 'Name';
+			nameLabel.style.marginBottom = '4px';
+			nameLabel.style.display = 'block';
+			box.appendChild(nameLabel);
 
-		const nameInput = document.createElement('input');
-		nameInput.classList.add(this.CSS.input);
-		nameInput.value = dataset.label || '';
-		nameInput.placeholder = 'Enter dataset name';
-		nameInput.style.marginBottom = '12px';
-		nameInput.addEventListener('input', (e) => {
-			dataset.label = e.target.value;
-			this._updateChart();
-		});
-		box.appendChild(nameInput);
+			const nameInput = document.createElement('input');
+			nameInput.classList.add(this.CSS.input);
+			nameInput.value = dataset.label || '';
+			nameInput.placeholder = 'Enter dataset name';
+			nameInput.style.marginBottom = '12px';
+			nameInput.addEventListener('input', (e) => {
+				dataset.label = e.target.value;
+				this._updateChart();
+			});
+			box.appendChild(nameInput);
+		}
 
-		// Data values with label
+		// Data values
+		if (isSegmentBased) {
+			// For segment-based charts, show label-value-color rows
+			this._createSegmentDataEditor(box, dataset);
+		} else {
+			// For regular charts, show comma-separated values
+			const dataLabel = document.createElement('label');
+			dataLabel.classList.add(this.CSS.label);
+			dataLabel.textContent = 'Values';
+			dataLabel.style.marginBottom = '4px';
+			dataLabel.style.display = 'block';
+			box.appendChild(dataLabel);
+
+			const dataInput = document.createElement('input');
+			dataInput.classList.add(this.CSS.input);
+			dataInput.value = dataset.data.join(', ');
+			dataInput.placeholder = 'Enter values separated by commas';
+			dataInput.style.marginBottom = '16px';
+			dataInput.addEventListener('input', (e) => {
+				dataset.data = e.target.value
+					.split(',')
+					.map((v) => parseFloat(v.trim()))
+					.filter((v) => !isNaN(v));
+				this._updateChart();
+			});
+			box.appendChild(dataInput);
+
+			// Color header with toggle switch
+			const colorHeaderWrapper = document.createElement('div');
+			colorHeaderWrapper.style.cssText = `
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				margin-bottom: 8px;
+			`;
+
+			const colorLabel = document.createElement('div');
+			colorLabel.classList.add(this.CSS.label);
+			colorLabel.textContent = 'Color';
+
+			const toggleWrapper = document.createElement('div');
+			toggleWrapper.style.cssText = `
+				display: flex;
+				align-items: center;
+				gap: 8px;
+			`;
+
+			const toggleSwitch = document.createElement('input');
+			toggleSwitch.type = 'checkbox';
+			toggleSwitch.checked = !!dataset.useMultiColor;
+
+			const toggleLabel = document.createElement('label');
+			toggleLabel.style.cssText = `
+				font-size: 12px;
+				font-weight: 500;
+				color: #707684;
+				cursor: pointer;
+				user-select: none;
+			`;
+			toggleLabel.textContent = 'Per value';
+
+			toggleSwitch.addEventListener('change', (e) => {
+				dataset.useMultiColor = e.target.checked;
+				if (e.target.checked) {
+					// Convert single color to array
+					const currentColor = Array.isArray(dataset.backgroundColor)
+						? dataset.backgroundColor[0]
+						: dataset.backgroundColor;
+					dataset.backgroundColor = dataset.data.map(
+						(_, idx) => this.colors[idx % this.colors.length],
+					);
+				} else {
+					// Convert array to single color
+					const firstColor = Array.isArray(dataset.backgroundColor)
+						? dataset.backgroundColor[0]
+						: dataset.backgroundColor;
+					dataset.backgroundColor = firstColor || this.colors[0];
+				}
+				this._refreshDatasets();
+				this._updateChart();
+			});
+
+			toggleWrapper.appendChild(toggleSwitch);
+			toggleWrapper.appendChild(toggleLabel);
+
+			colorHeaderWrapper.appendChild(colorLabel);
+			colorHeaderWrapper.appendChild(toggleWrapper);
+			box.appendChild(colorHeaderWrapper);
+
+			// Show different UI based on multi-color mode
+			if (dataset.useMultiColor) {
+				// Multi-color mode: show segment editor
+				this._createSegmentDataEditor(box, dataset);
+			} else {
+				// Single color mode: show color grid
+				const currentColor = Array.isArray(dataset.backgroundColor)
+					? dataset.backgroundColor[0] || this.colors[0]
+					: dataset.backgroundColor;
+
+				const colorGrid = document.createElement('div');
+				colorGrid.classList.add(this.CSS.colors);
+
+				this.colors.forEach((color) => {
+					const colorBtn = document.createElement('button');
+					colorBtn.classList.add(this.CSS.color);
+					colorBtn.style.backgroundColor = color;
+
+					if (currentColor === color) {
+						colorBtn.classList.add(this.CSS.colorSelected);
+					}
+
+					colorBtn.addEventListener('click', () => {
+						dataset.backgroundColor = color;
+						this._updateChart();
+
+						// Update selected state
+						colorGrid
+							.querySelectorAll(`.${this.CSS.color}`)
+							.forEach((btn) => {
+								btn.classList.remove(this.CSS.colorSelected);
+							});
+						colorBtn.classList.add(this.CSS.colorSelected);
+					});
+
+					colorGrid.appendChild(colorBtn);
+				});
+
+				box.appendChild(colorGrid);
+			}
+		}
+
+		return box;
+	}
+
+	_createSegmentDataEditor(container, dataset) {
+		const isSegmentBased = this._isSegmentBasedChart();
+
+		// Ensure backgroundColor is an array
+		if (!Array.isArray(dataset.backgroundColor)) {
+			dataset.backgroundColor = dataset.data.map(
+				(_, idx) => this.colors[idx % this.colors.length],
+			);
+		}
+
 		const dataLabel = document.createElement('label');
 		dataLabel.classList.add(this.CSS.label);
-		dataLabel.textContent = 'Values';
-		dataLabel.style.marginBottom = '4px';
+		dataLabel.textContent = isSegmentBased ? 'Segments' : 'Values & Colors';
+		dataLabel.style.marginBottom = '8px';
 		dataLabel.style.display = 'block';
-		box.appendChild(dataLabel);
+		container.appendChild(dataLabel);
 
-		const dataInput = document.createElement('input');
-		dataInput.classList.add(this.CSS.input);
-		dataInput.value = dataset.data.join(', ');
-		dataInput.placeholder = 'Enter values separated by commas';
-		dataInput.style.marginBottom = '16px';
-		dataInput.addEventListener('input', (e) => {
-			dataset.data = e.target.value
-				.split(',')
-				.map((v) => parseFloat(v.trim()))
-				.filter((v) => !isNaN(v));
-			this._updateChart();
+		// Create row for each data point
+		this.data.labels.forEach((label, idx) => {
+			const row = document.createElement('div');
+			row.classList.add(this.CSS.dataRow);
+			row.style.marginBottom = '8px';
+
+			// Label (read-only for segment-based, editable for others)
+			if (isSegmentBased) {
+				const labelInput = document.createElement('input');
+				labelInput.classList.add(this.CSS.input);
+				labelInput.value = label;
+				labelInput.disabled = true;
+				labelInput.style.backgroundColor = '#f5f5f5';
+				row.appendChild(labelInput);
+			} else {
+				// For non-segment charts just show the label as text
+				const labelDiv = document.createElement('div');
+				labelDiv.style.cssText = `
+					padding: 10px 12px;
+					background: #f5f5f5;
+					border: 1px solid #e4e6eb;
+					border-radius: 6px;
+					font-size: 14px;
+					display: flex;
+					align-items: center;
+				`;
+				labelDiv.textContent = label;
+				row.appendChild(labelDiv);
+			}
+
+			// Value input
+			const valueInput = document.createElement('input');
+			valueInput.classList.add(this.CSS.input);
+			valueInput.type = 'number';
+			valueInput.value = dataset.data[idx] || 0;
+			valueInput.placeholder = 'Value';
+			valueInput.addEventListener('input', (e) => {
+				const value = parseFloat(e.target.value);
+				if (!isNaN(value)) {
+					dataset.data[idx] = value;
+					this._updateChart();
+				}
+			});
+			row.appendChild(valueInput);
+
+			// Color picker button
+			const colorBtn = document.createElement('button');
+			colorBtn.classList.add(this.CSS.color);
+			colorBtn.style.backgroundColor =
+				dataset.backgroundColor[idx] ||
+				this.colors[idx % this.colors.length];
+			colorBtn.style.width = '36px';
+			colorBtn.style.height = '36px';
+			colorBtn.style.flexShrink = '0';
+			colorBtn.title = 'Click to change color';
+
+			colorBtn.addEventListener('click', (e) => {
+				e.preventDefault();
+				this._showColorPicker(colorBtn, (color) => {
+					dataset.backgroundColor[idx] = color;
+					colorBtn.style.backgroundColor = color;
+					this._updateChart();
+				});
+			});
+
+			row.appendChild(colorBtn);
+			container.appendChild(row);
 		});
-		box.appendChild(dataInput);
+	}
 
-		// Color picker with cleaner spacing
-		const colorLabel = document.createElement('div');
-		colorLabel.classList.add(this.CSS.label);
-		colorLabel.textContent = 'Color';
-		colorLabel.style.marginBottom = '8px';
-		colorLabel.style.display = 'block';
-		box.appendChild(colorLabel);
+	_showColorPicker(targetButton, onSelect) {
+		// Create popup color picker
+		const popup = document.createElement('div');
+		popup.style.cssText = `
+			position: fixed;
+			background: white;
+			border: 1px solid #e4e6eb;
+			border-radius: 8px;
+			padding: 12px;
+			box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+			z-index: 1000;
+		`;
 
 		const colorGrid = document.createElement('div');
-		colorGrid.classList.add(this.CSS.colors);
+		colorGrid.classList.add(this.CSS.colors, 'chart-tool__colors--popup');
 
 		this.colors.forEach((color) => {
 			const colorBtn = document.createElement('button');
 			colorBtn.classList.add(this.CSS.color);
 			colorBtn.style.backgroundColor = color;
 
-			if (dataset.backgroundColor === color) {
-				colorBtn.classList.add(this.CSS.colorSelected);
-			}
-
 			colorBtn.addEventListener('click', () => {
-				dataset.backgroundColor = color;
-				this._updateChart();
-
-				// Update selected state
-				colorGrid.querySelectorAll(`.${this.CSS.color}`).forEach((btn) => {
-					btn.classList.remove(this.CSS.colorSelected);
-				});
-				colorBtn.classList.add(this.CSS.colorSelected);
+				onSelect(color);
+				popup.remove();
 			});
 
 			colorGrid.appendChild(colorBtn);
 		});
 
-		box.appendChild(colorGrid);
+		popup.appendChild(colorGrid);
 
-		return box;
+		// Position near the target button
+		const rect = targetButton.getBoundingClientRect();
+		popup.style.top = `${rect.bottom + 8}px`;
+		popup.style.left = `${rect.left}px`;
+
+		document.body.appendChild(popup);
+
+		// Close on click outside
+		const closeHandler = (e) => {
+			if (!popup.contains(e.target) && e.target !== targetButton) {
+				popup.remove();
+				document.removeEventListener('click', closeHandler);
+			}
+		};
+
+		setTimeout(() => {
+			document.addEventListener('click', closeHandler);
+		}, 0);
 	}
-
 	_updateChart() {
 		const canvas = this.wrapper.querySelector('canvas');
 		this._createChart(canvas);
@@ -379,27 +625,26 @@ export default class ChartTool {
 		// Create temporary input overlay
 		const canvas = this.wrapper.querySelector('canvas');
 		const canvasWrapper = canvas.parentElement;
-		const rect = canvas.getBoundingClientRect();
 
 		const input = document.createElement('input');
 		input.type = 'text';
 		input.value = this.data.title || '';
 		input.placeholder = 'Enter chart title...';
 		input.style.cssText = `
-			position: absolute;
-			top: 10px;
-			left: 50%;
-			transform: translateX(-50%);
-			width: 60%;
-			padding: 8px 12px;
-			font-size: 16px;
-			font-weight: bold;
-			text-align: center;
-			border: 2px solid #3f8ae0;
-			border-radius: 4px;
-			z-index: 1000;
-			background: white;
-		`;
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60%;
+            padding: 8px 12px;
+            font-size: 16px;
+            font-weight: bold;
+            text-align: center;
+            border: 2px solid #3f8ae0;
+            border-radius: 4px;
+            z-index: 1000;
+            background: white;
+        `;
 
 		canvasWrapper.style.position = 'relative';
 		canvasWrapper.appendChild(input);
@@ -425,19 +670,6 @@ export default class ChartTool {
 
 	save() {
 		return this.data;
-	}
-
-	renderSettings() {
-		const wrapper = document.createElement('div');
-
-		// Chart type tune menu
-		this.api.ui.createTune({
-			icon: `<svg width="17" height="15" viewBox="0 0 17 15"><path d="M1 1h15M1 7.5h15M1 14h15" stroke="currentColor" stroke-width="2" fill="none"/></svg>`,
-			label: 'Chart Type',
-			onActivate: () => {},
-		});
-
-		return wrapper;
 	}
 
 	static get tunes() {
@@ -476,8 +708,6 @@ export default class ChartTool {
 	}
 
 	renderSettings() {
-		const wrapper = document.createElement('div');
-
 		const items = ChartTool.tunes.map((tune) => ({
 			icon: tune.icon,
 			label: tune.title,
@@ -485,6 +715,7 @@ export default class ChartTool {
 			closeOnActivate: true,
 			onActivate: () => {
 				this.data.type = tune.name;
+				this._refreshDatasets();
 				this._updateChart();
 			},
 		}));

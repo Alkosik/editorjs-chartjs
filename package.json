@@ -1,6 +1,6 @@
 {
 	"name": "editorjs-chartjs",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"description": "A Chart.js integration block",
 	"main": "index.js",
 	"scripts": {
@@ -9,6 +9,15 @@
 		"test": "echo \"Error: no test specified\" && exit 1"
 	},
 	"author": "Alkosik",
+	"keywords": [
+		"codex",
+		"codex-editor",
+		"editor.js",
+		"editorjs",
+		"chart",
+		"chart.js",
+		"data-visualization"
+	],
 	"license": "ISC",
 	"dependencies": {
 		"chart.js": "^4.5.1"
